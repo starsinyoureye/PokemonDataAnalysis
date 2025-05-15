@@ -1,0 +1,1049 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+```yaml
+---
+title: "Group20_STA3005_Project"
+author:
+  - "Wu, Yanyi (122090587)"
+  - "Shi, Jingxuan (121090479)"
+  - "Wu, Yimou (121090617)"
+date: "Started from Apr 2, 2025"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+```
+
+```{r setup, include=FALSE}
+# --------------------------------------------------------------------------
+# Global Options
+# --------------------------------------------------------------------------
+knitr::opts_chunk$set(echo = TRUE, 
+                      cache = TRUE, 
+                      autodep = TRUE,
+                      cache.comments = TRUE)
+```
+
+# Introduction
+
+This R Markdown document outlines our **R Package Proposal: Pokémon** based on the guidelines from *Package Guideline 2025*. Our package is tentatively named **`PokemonAnalysis`** and aims to provide a data analysis toolkit that explores relationships between Pokémon’s physical attributes and their combat abilities, using the open-source **`pokemon.csv`** dataset. 
+
+The main objectives include:
+
+1. Building classification models to identify legendary Pokémon.  
+2. Analyzing correlations between height, weight, and various base stats (HP, Attack, Defense, Speed, etc.).  
+3. Investigating which factors (type, stats, etc.) influence experience growth and egg steps.  
+4. Evaluating strengths and weaknesses across different Pokémon types.  
+5. Determining which types/patterns are most likely to be legendary.  
+6. Constructing a “dream team” of six Pokémon optimized for maximum damage and balanced defense.  
+
+We follow the instructions to meet the grading criteria (proposal, completeness, vignettes) while incorporating the recommended development workflow and “no errors/warnings” automated checking.
+
+---
+
+# Dataset Overview
+
+Our dataset, **`pokemon.csv`**, contains information on 802 Pokémon from all seven generations:
+
+- **name**: English name of the Pokémon  
+- **japanese_name**: Original Japanese name  
+- **pokedex_number**: National Pokédex number  
+- **percentage_male**: Percentage of the species that are male (blank if genderless)  
+- **type1**, **type2**: Primary and secondary Pokémon types  
+- **classification**: Sun and Moon Pokédex classification text  
+- **height_m**, **weight_kg**: Physical stats for height (m) and weight (kg)  
+- **capture_rate**, **base_egg_steps**: Numerical measures for capture difficulty and egg hatching steps  
+- **abilities**: List of possible abilities  
+- **experience_growth**, **base_happiness**: Growth and happiness statistics  
+- **against_* columns**: Eighteen columns for how much damage is taken from each attack type (e.g., *against_bug*, *against_dark*, etc.)  
+- **hp, attack, defense, sp_attack, sp_defense, speed**: Base stats for combat  
+- **generation**: Generation introduced (1 to 7)  
+- **is_legendary**: Boolean indicator (legendary or non-legendary)  
+
+Below is a quick demonstration of loading the data and performing an exploratory overview.
+
+```{r data-overview}
+suppressPackageStartupMessages(library(dplyr))
+
+pokemon <- read.csv("pokemon.csv", stringsAsFactors = FALSE)
+
+# Quick peek at the dataset structure
+summary(pokemon[, c("name", "type1", "type2", "hp", "attack", "defense", "speed", "is_legendary")])
+head(pokemon)
+```
+
+We confirm that columns such as **hp**, **attack**, **defense**, and **speed** are numerical, while **type1**, **type2**, and **is_legendary** are useful categorical fields for classification tasks.
+
+---
+
+# Proposed R Package Structure
+
+Following the *Package Guideline 2025*, we plan to include:
+
+1. **DESCRIPTION** (draft already present)  
+   - Contains package metadata, authorship, version, license (MIT), and other fields.
+
+2. **R code** (at least 8 functions)  
+   - Each function addresses a different aspect of Pokémon analysis:
+     1. `classify_legendary()`: Logistic model or random forest to predict `is_legendary`.  
+     2. `correlate_stats()`: Correlation analysis between physical attributes and base stats.  
+     3. `analyze_experience()`: Investigate experience growth and influences (e.g., type, generation).  
+     4. `egg_steps_factors()`: Model the relationship between `base_egg_steps`, stats, and type.  
+     5. `strength_weakness_table()`: Summarize damage multipliers vs. type1/type2.  
+     6. `dream_team_builder()`: Select top 6 Pokémon to form a balanced team.  
+     7. `plot_base_stats()`: Visualize distributions (e.g., boxplots, scatter plots).  
+     8. `predictive_test()`: Automated check with testthat on classification performance.  
+
+3. **Vignettes** (at least 2)  
+   1. **`UsingPokemonAnalysis.Rmd`**: Comprehensive tutorial on reading data, running classification, visualizing results, building a team.  
+   2. **`InDepthInsights.Rmd`**: Explores advanced analyses such as synergy among type combos, partial dependence plots for legendary classification, etc.  
+
+4. **Data set**  
+   - Bundled within the package as `data("pokemon")` or loaded externally from CSV.
+
+5. **Automated tests** (`testthat`)  
+   - Key output tests for classification accuracy, correlation checks, dimension correctness, and defensive coding.
+
+We will strive to pass `R CMD check` with **no errors and no warnings** by properly documenting code (roxygen2), ensuring the package structure is consistent with CRAN standards, and providing examples in each function-level help file.
+
+---
+
+# Example Function Definitions
+
+Below are prototypes for some of the planned functions:
+
+```{r function-prototypes, eval=TRUE}
+#' Classify Legendary Pokemon
+#'
+#' This function trains a simple classifier (logistic regression or random forest)
+#' to predict whether a Pokemon is legendary.
+#'
+#' @param data A data frame of Pokemon data
+#' @return A trained model object
+#' @export
+classify_legendary <- function(data) {
+  # Basic logistic regression example
+  # We'll treat is_legendary as a factor for classification.
+  df <- data %>%
+    filter(!is.na(is_legendary)) %>%
+    mutate(isLegendary = factor(is_legendary, levels = c(0,1)))
+
+  # For illustration, use a logistic model with key numeric predictors
+  fit <- glm(isLegendary ~ hp + attack + defense + speed,
+             data = df, family = binomial)
+  return(fit)
+}
+
+
+```
+
+```{r Code_for_correlate_stats_function ..., eval=TRUE}
+
+#' Correlate Stats
+#'
+#' Compute correlations between critical numeric variables (height, weight, HP, etc.)
+#'
+#' @param data A data frame of Pokemon data
+#' @return A correlation matrix
+#' @export
+correlate_stats <- function(data) {
+  numeric_cols <- c("height_m", "weight_kg", "hp", "attack", "defense",
+                    "sp_attack", "sp_defense", "speed")
+  df <- data[, numeric_cols]
+  return(cor(df, use="complete.obs"))
+}
+
+```
+
+```{r Code_for_dream_team_builder, eval=TRUE}
+
+#' Dream Team Builder
+#'
+#' Select six Pokemon to form a balanced team that maximizes a simple composite of
+#' offense (attack + sp_attack) and defense (defense + sp_defense).
+#'
+#' @param data A data frame of Pokemon data
+#' @return A tibble/data.frame of six recommended Pokemon
+#' @export
+dream_team_builder <- function(data) {
+  data <- data %>%
+    mutate(offense_score = attack + sp_attack,
+           defense_score = defense + sp_defense,
+           total_score = offense_score + defense_score) %>%
+    arrange(desc(total_score))
+  
+  # For simplicity, pick top 6
+  return(head(data, 6))
+}
+```
+These examples demonstrate a subset of the planned functionalities. Each function will be fully documented using **roxygen2** tags and tested.
+
+---
+
+# Demonstration of Key Analyses
+
+In this section, we illustrate a few example analyses **directly in R Markdown**. Eventually, we will migrate them into package vignettes.
+
+## 1. Legendary Classification (Logistic Model)
+
+```{r class-example, eval=FALSE}
+# Example usage
+model_legendary <- classify_legendary(pokemon)
+summary(model_legendary)
+```
+
+## 2. Correlation Among Stats
+
+```{r cor-example, eval=TRUE}
+cors <- correlate_stats(pokemon)
+knitr::kable(round(cors, 2), caption = "Correlation Matrix Among Key Stats")
+```
+
+## 3. Visualizing HP vs. Attack
+
+Using **ggplot2** to illustrate some data visualization:
+
+```{r ggplot-example, echo=TRUE}
+library(ggplot2)
+
+ggplot(pokemon, aes(x = hp, y = attack, color = factor(is_legendary))) +
+  geom_point(alpha = 0.7) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "HP vs. Attack by Legendary Status",
+    x = "HP",
+    y = "Attack",
+    color = "Legendary"
+  )
+```
+
+---
+
+# Testing and Checks
+
+According to the guidelines, we must define automated tests. Our group will use [**`testthat`**](https://testthat.r-lib.org/) to ensure key functions behave correctly:
+
+1. **Output Validity**: Functions return correct object classes.  
+2. **Accuracy**: Classification passes at least a baseline threshold (e.g., 75% on a test set).  
+3. **Data Dimensions**: Checking for missing columns, NAs, etc.  
+
+Below is a simplified outline of a test file `test-classify_legendary.R`:
+
+
+```{r}
+# Load necessary libraries
+library(assertthat)
+library(dplyr)
+
+# Load the CSV file
+pokemon <- read.csv("pokemon.csv", stringsAsFactors = FALSE)
+
+# Example test
+fit <- classify_legendary(pokemon)
+
+# Assert the object is of class glm
+assert_that(inherits(fit, "glm"))
+```
+
+
+
+
+
+---
+
+# Conclusion and Learned Points for the first part
+
+This package, **PokemonAnalysis**, highlights the power of R packages for data science tasks:
+
+1. **R Package Infrastructure**: Using `devtools`, `usethis`, and `roxygen2` to manage development.  
+2. **Pipe Operator**: Efficient chaining of transformations with `%>%`.  
+3. **Tidyverse**: Seamless data manipulation using **dplyr** and data visualization using **ggplot2**.  
+4. **Automated Testing**: Ensuring reliability with **testthat**.  
+5. **Documentation**: Clear roxygen-based documentation helps future users.  
+6. **Modular Design**: Breaking tasks into separate functions.  
+7. **Reproducibility**: Vignettes as dynamic, reproducible reports.  
+8. **Real-World Relevance**: Familiar Pokémon dataset used to demonstrate classification, correlation, and advanced R workflows.
+
+
+---
+
+# Vignette Plan
+
+We will create **two main vignettes**:
+
+1. **`UsingPokemonAnalysis.Rmd`**  
+   - Demonstrates reading the `pokemon` data, applying each function (classification, correlation, dream-team building).  
+   - Shows example data transformations with the pipe operator (`%>%`).  
+   - Concludes with additional plots comparing base stats across generations.
+
+2. **`InDepthInsights.Rmd`**  
+   - Explores synergy among types, legendary-likelihood predictions, and partial dependence for classification.  
+   - Emphasizes advanced usage and tips gleaned from *Statistics Computing* methods (like vectorization, code efficiency).  
+   
+---
+
+
+
+# Implementation
+# Vignette: UsingPokemonAnalysis.Rmd
+
+This vignette demonstrates how to use the `PokemonAnalysis` package to perform various analyses on the Pokémon dataset, including reading the data, applying functions for classification, correlation analysis, dream-team building, and visualizing results.
+
+## Installation
+
+First, ensure that you have installed the `PokemonAnalysis` package. Since this is a hypothetical package for the purpose of this project, we'll assume that the functions are defined within this R Markdown file for demonstration purposes.
+
+```{r installation, eval=FALSE}
+# Install the package (not applicable here)
+# install.packages("PokemonAnalysis")
+```
+
+## Loading Required Libraries
+
+We begin by loading the necessary libraries.
+
+```{r load-libraries}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(assertthat)
+
+# If the functions are part of a package, load the package
+# library(PokemonAnalysis)
+
+# For demonstration, we will define the functions here
+```
+
+## Reading the Pokémon Data
+
+We read the `pokemon.csv` dataset into R.
+
+```{r read-data}
+pokemon <- read.csv("pokemon.csv", stringsAsFactors = FALSE)
+
+# Quick peek at the data
+head(pokemon)
+```
+
+## Function Definitions
+
+### Function: `classify_legendary`
+
+We define the `classify_legendary` function to train a logistic regression model predicting whether a Pokémon is legendary.
+
+```{r define-classify-legendary}
+classify_legendary <- function(data) {
+  df <- data %>%
+    filter(!is.na(is_legendary)) %>%
+    mutate(isLegendary = factor(is_legendary, levels = c(0, 1)))
+
+  fit <- glm(isLegendary ~ hp + attack + defense + speed,
+             data = df, family = binomial)
+  return(fit)
+}
+```
+
+### Function: `correlate_stats`
+
+We define the `correlate_stats` function to compute correlations among key statistics.
+
+```{r define-correlate-stats}
+correlate_stats <- function(data) {
+  numeric_cols <- c("height_m", "weight_kg", "hp", "attack", "defense",
+                    "sp_attack", "sp_defense", "speed")
+  df <- data[, numeric_cols]
+  return(cor(df, use = "complete.obs"))
+}
+```
+
+### Function: `dream_team_builder`
+
+We define the `dream_team_builder` function to select a top team of six Pokémon based on combined offensive and defensive scores.
+
+```{r define-dream-team-builder}
+dream_team_builder <- function(data) {
+  data <- data %>%
+    mutate(offense_score = attack + sp_attack,
+           defense_score = defense + sp_defense,
+           total_score = offense_score + defense_score) %>%
+    arrange(desc(total_score))
+
+  # Return the top 6 Pokémon
+  return(head(data, 6))
+}
+```
+
+## Applying Functions
+
+### 1. Classifying Legendary Pokémon
+
+We apply the `classify_legendary` function to our data and examine the model summary.
+
+```{r apply-classify-legendary}
+# Train the model
+model_legendary <- classify_legendary(pokemon)
+
+# View the summary of the model
+summary(model_legendary)
+```
+
+The summary shows the coefficients of the logistic regression model, indicating which statistics are significant predictors of legendary status.
+
+### 2. Correlation Analysis
+
+We compute the correlation matrix among key stats using `correlate_stats`.
+
+```{r apply-correlate-stats}
+cors <- correlate_stats(pokemon)
+
+# Display the correlation matrix
+knitr::kable(round(cors, 2), caption = "Correlation Matrix Among Key Stats")
+```
+
+The correlation matrix reveals relationships between physical attributes and combat stats, aiding in understanding how different variables interact.
+
+### 3. Building a Dream Team
+
+We use the `dream_team_builder` function to select a top team of Pokémon.
+
+```{r apply-dream-team-builder}
+dream_team <- dream_team_builder(pokemon)
+
+# Display the dream team
+knitr::kable(dream_team[, c("name", "type1", "type2", "total_score")], caption = "Dream Team of Pokémon")
+```
+
+This team consists of Pokémon with the highest combined offensive and defensive capabilities.
+
+## Data Transformations with the Pipe Operator `%>%`
+
+The `dplyr` package allows for seamless data transformations using the pipe operator. Here is an example of filtering and summarizing data.
+
+```{r data-transformations}
+# Calculate average stats for each type
+avg_stats_by_type <- pokemon %>%
+  group_by(type1) %>%
+  summarise(
+    avg_hp = mean(hp, na.rm = TRUE),
+    avg_attack = mean(attack, na.rm = TRUE),
+    avg_defense = mean(defense, na.rm = TRUE),
+    avg_speed = mean(speed, na.rm = TRUE)
+  ) %>%
+  arrange(desc(avg_attack))
+
+# Display the result
+knitr::kable(avg_stats_by_type, caption = "Average Stats by Primary Type")
+```
+
+## Visualizations
+
+### Plotting Base Stats Across Generations
+
+We conclude with additional plots comparing base stats across generations.
+
+```{r plot-base-stats}
+ggplot(pokemon, aes(x = generation, y = attack)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(
+    title = "Distribution of Attack Stats Across Generations",
+    x = "Generation",
+    y = "Attack"
+  )
+```
+
+### HP vs. Defense Colored by Legendary Status
+
+```{r plot-hp-defense}
+ggplot(pokemon, aes(x = hp, y = defense, color = factor(is_legendary))) +
+  geom_point(alpha = 0.7) +
+  theme_minimal() +
+  labs(
+    title = "HP vs. Defense by Legendary Status",
+    x = "HP",
+    y = "Defense",
+    color = "Legendary"
+  )
+```
+
+---
+
+# Vignette: InDepthInsights.Rmd
+
+In this vignette, we delve deeper into advanced analyses, exploring the synergy among Pokémon types, legendary-likelihood predictions, and applying advanced statistical methods like partial dependence plots.
+
+## Loading Required Libraries
+
+We begin by loading necessary libraries and defining any additional functions.
+
+```{r load-libraries-advanced}
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+library(caret)
+# library(ggpubr)
+# For partial dependence plots
+library(pdp)
+```
+
+## Reading the Pokémon Data
+
+```{r read-data-advanced}
+pokemon <- read.csv("pokemon.csv", stringsAsFactors = FALSE)
+```
+
+## Exploring Synergy Among Types
+
+We investigate the combinations of primary and secondary types and how they relate to overall stats.
+
+```{r type-synergy}
+# Count number of Pokémon for each type combination
+type_combinations <- pokemon %>%
+  count(type1, type2, sort = TRUE)
+
+# Display top type combinations
+knitr::kable(head(type_combinations, 10), caption = "Top Type Combinations")
+```
+
+### Analysis of Type Combination Strength
+
+```{r type-combination-strength}
+type_stats <- pokemon %>%
+  group_by(type1, type2) %>%
+  summarise(
+    average_total = mean(hp + attack + defense + sp_attack + sp_defense + speed, na.rm = TRUE),
+    count = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(average_total))
+
+# Display top 10 type combinations by average total stats
+knitr::kable(head(type_stats, 10), caption = "Strongest Type Combinations by Average Total Stats")
+```
+
+## Legendary Likelihood Predictions Using Random Forest
+
+We build a more advanced classifier using a random forest to predict legendary status.
+
+### Preparing the Data
+
+```{r prepare-data-rf}
+# Clean and prepare the data
+df <- pokemon %>%
+  filter(!is.na(is_legendary)) %>%
+  select(hp, attack, defense, sp_attack, sp_defense, speed, type1, type2, is_legendary) %>%
+  mutate(
+    isLegendary = factor(is_legendary),
+    type1 = as.factor(type1),
+    type2 = as.factor(type2)
+  )
+```
+
+### Training a Random Forest Model
+
+```{r train-rf-model}
+set.seed(123) # For reproducibility
+
+# Split data into training and testing sets
+trainIndex <- createDataPartition(df$isLegendary, p = .7, list = FALSE)
+trainData <- df[trainIndex, ]
+testData <- df[-trainIndex, ]
+
+# Train the random forest model
+rf_model <- randomForest(isLegendary ~ ., data = trainData, importance = TRUE)
+
+# View model summary
+print(rf_model)
+```
+
+### Evaluating the Model
+
+```{r evaluate-rf-model}
+# Predict on test data
+predictions <- predict(rf_model, newdata = testData)
+
+# Confusion matrix
+conf_mat <- confusionMatrix(predictions, testData$isLegendary)
+print(conf_mat)
+```
+
+The high accuracy and kappa statistic indicate a strong model performance.
+
+### Variable Importance
+
+```{r variable-importance}
+# Variable importance plot
+varImpPlot(rf_model, main = "Variable Importance in Predicting Legendary Status")
+```
+
+### Partial Dependence Plots
+
+We examine how individual variables affect the probability of being legendary.
+
+```{r partial-dependence}
+# For example, partial dependence of attack
+pdp_attack <- partial(rf_model, pred.var = "attack", grid.resolution = 10)
+autoplot(pdp_attack) + ggtitle("Partial Dependence of Attack on Legendary Status")
+```
+
+Repeat for other important variables as desired.
+
+## Advanced Tips for Statistical Computing
+
+### Vectorization and Code Efficiency
+
+We showcase how vectorized operations in R can greatly improve computational efficiency.
+
+```{r vectorization-example}
+# Inefficient approach
+system.time({
+  slow_result <- rep(NA, nrow(pokemon))
+  for (i in 1:nrow(pokemon)) {
+    slow_result[i] <- pokemon$attack[i] + pokemon$defense[i]
+  }
+})
+
+# Efficient vectorized approach
+system.time({
+  fast_result <- pokemon$attack + pokemon$defense
+})
+
+# Check that results are equivalent
+all.equal(slow_result, fast_result)
+```
+
+The vectorized approach is significantly faster, demonstrating the importance of applying vectorization in R code.
+
+
+---
+
+# Analyze-type Function Definitions and Usage
+The Implementation of 'analyze_experience()', 'egg_steps_factors()', 'strength_weakness_table()', 'plot_base_stats()', 'predictive_test()'.
+
+## 4. `analyze_experience()`
+
+**Description**: Investigate experience growth and its influences, such as type and generation.
+
+### Function Definition
+
+```{r}
+#' Analyze Experience Growth
+#'
+#' This function models the relationship between experience growth and various factors
+#' such as type and generation using linear regression.
+#'
+#' @param data A data frame of Pokémon data
+#' @return A list containing the linear model and a summary
+#' @export
+analyze_experience <- function(data) {
+  # Ensure necessary columns are available
+  required_cols <- c("experience_growth", "type1", "generation")
+  if (!all(required_cols %in% names(data))) {
+    stop("Data must contain 'experience_growth', 'type1', and 'generation' columns")
+  }
+  
+  # Clean and prepare the data
+  df <- data %>%
+    filter(!is.na(experience_growth)) %>%
+    mutate(
+      type1 = as.factor(type1),
+      generation = as.factor(generation)
+    )
+  
+  # Fit a linear model
+  fit <- lm(experience_growth ~ type1 + generation, data = df)
+  
+  return(list(model = fit, summary = summary(fit)))
+}
+```
+
+### Usage and Validation
+
+```{r}
+# Apply the function
+experience_analysis <- analyze_experience(pokemon)
+
+# View the summary of the linear model
+print(experience_analysis$summary)
+```
+
+**Interpretation**:
+
+- The summary provides coefficients for each type and generation.
+- Significant p-values indicate factors that significantly influence experience growth.
+
+### Visualization
+
+Let's visualize the average experience growth by primary type.
+
+```{r}
+# Calculate average experience growth by type
+avg_exp_by_type <- pokemon %>%
+  group_by(type1) %>%
+  summarise(avg_experience = mean(experience_growth, na.rm = TRUE)) %>%
+  arrange(desc(avg_experience))
+
+# Plotting
+ggplot(avg_exp_by_type, aes(x = reorder(type1, -avg_experience), y = avg_experience)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  labs(
+    title = "Average Experience Growth by Type",
+    x = "Primary Type",
+    y = "Average Experience Growth"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Explanation**:
+
+- The bar chart displays which types have higher or lower average experience growth.
+- Types with higher bars are associated with Pokémon that generally require more experience to level up.
+
+---
+
+## 5. `egg_steps_factors()`
+
+**Description**: Model the relationship between `base_egg_steps`, stats, and type.
+
+### Function Definition
+
+```{r}
+#' Egg Steps Factors Analysis
+#'
+#' This function models the relationship between base egg steps and various factors
+#' such as base stats and type.
+#'
+#' @param data A data frame of Pokémon data
+#' @return A list containing the linear model and a summary
+#' @export
+egg_steps_factors <- function(data) {
+  # Ensure necessary columns are available
+  required_cols <- c("base_egg_steps", "type1", "hp", "attack", "defense", "sp_attack", "sp_defense", "speed")
+  if (!all(required_cols %in% names(data))) {
+    stop("Data must contain 'base_egg_steps', 'type1', and base stats columns")
+  }
+  
+  # Clean and prepare the data
+  df <- data %>%
+    filter(!is.na(base_egg_steps)) %>%
+    mutate(
+      type1 = as.factor(type1)
+    )
+  
+  # Base stats total
+  df$stat_total <- df$hp + df$attack + df$defense + df$sp_attack + df$sp_defense + df$speed
+  
+  # Fit a linear model
+  fit <- lm(base_egg_steps ~ stat_total + type1, data = df)
+  
+  return(list(model = fit, summary = summary(fit)))
+}
+```
+
+### Usage and Validation
+
+```{r}
+# Apply the function
+egg_steps_analysis <- egg_steps_factors(pokemon)
+
+# View the summary of the linear model
+print(egg_steps_analysis$summary)
+```
+
+**Interpretation**:
+
+- The summary indicates how stats and types affect the number of steps required to hatch an egg.
+- Significant coefficients suggest that certain stats or types have a measurable impact on egg steps.
+
+### Visualization
+
+Visualize the relationship between base egg steps and total base stats.
+
+```{r}
+ggplot(pokemon, aes(x = hp + attack + defense + sp_attack + sp_defense + speed, y = base_egg_steps)) +
+  geom_point(alpha = 0.7) +
+  theme_minimal() +
+  labs(
+    title = "Base Egg Steps vs. Total Base Stats",
+    x = "Total Base Stats",
+    y = "Base Egg Steps"
+  )
+```
+
+**Explanation**:
+
+- This scatter plot helps visualize whether there's a correlation between a Pokémon's total stats and the number of steps required for its egg to hatch.
+- A trend line can be added to assess the relationship more clearly:
+
+```{r}
+geom_smooth(method = "lm", se = FALSE, color = "red")
+```
+
+---
+
+## 6. `strength_weakness_table()`
+
+**Description**: Summarize damage multipliers against each type based on `type1` and `type2`.
+
+### Function Definition
+
+```{r}
+#' Strength and Weakness Table
+#'
+#' This function summarizes the average damage multipliers against each Pokémon
+#' based on their primary and secondary types.
+#'
+#' @param data A data frame of Pokémon data
+#' @return A data frame summarizing strengths and weaknesses
+#' @export
+strength_weakness_table <- function(data) {
+  # Select relevant columns
+  against_cols <- grep('^against_', names(data), value = TRUE)
+  required_cols <- c('name', 'type1', 'type2', against_cols)
+  
+  df <- data[, required_cols]
+  
+  # Melt data to long format
+  library(tidyr)
+  
+  df_long <- df %>%
+    pivot_longer(
+      cols = starts_with('against_'),
+      names_to = 'against_type',
+      names_prefix = 'against_',
+      values_to = 'multiplier'
+    )
+  
+  # Summarize multipliers by type1 and type2
+  summary_table <- df_long %>%
+    group_by(type1, type2, against_type) %>%
+    summarise(
+      avg_multiplier = mean(multiplier, na.rm = TRUE),
+      .groups = 'drop'
+    ) %>%
+    arrange(type1, type2, against_type)
+  
+  return(summary_table)
+}
+```
+
+### Usage and Validation
+
+```{r}
+# Apply the function
+strength_weakness <- strength_weakness_table(pokemon)
+
+# View a portion of the table
+head(strength_weakness)
+```
+
+**Interpretation**:
+
+- The table shows how effective attacks of different types are against Pokémon of various type combinations.
+- An `avg_multiplier` greater than 1 indicates a weakness, while less than 1 indicates resistance.
+
+### Visualization
+
+Create a heatmap of average multipliers for a specific primary type.
+```{r}
+table(strength_weakness$type1, useNA = "ifany")
+table(strength_weakness$type2, useNA = "ifany")
+
+# 检查数据框
+# print(fire_weakness)
+
+# 查看行数
+# nrow(fire_weakness)
+```
+
+```{r}
+# Filter for primary type, e.g., 'Fire'
+fire_weakness <- strength_weakness %>%
+  filter(type1 == 'fire')
+
+# Plot heatmap
+ggplot(fire_weakness, aes(x = against_type, y = avg_multiplier)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  theme_minimal() +
+  labs(
+    title = "Average Damage Multiplier Against Fire Type",
+    x = "Attack Type",
+    y = "Average Multiplier"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Explanation**:
+
+- The bar chart illustrates the Fire type's strengths and weaknesses against different attack types.
+- This helps in understanding which attacks are most effective against Fire-type Pokémon.
+
+---
+
+## 7. `plot_base_stats()`
+
+**Description**: Visualize distributions of base stats using boxplots and scatter plots.
+
+### Function Definition
+
+```{r}
+#' Plot Base Stats Distribution
+#'
+#' This function creates various plots to visualize the distribution of base stats.
+#' It can generate boxplots and scatter plots for selected stats.
+#'
+#' @param data A data frame of Pokémon data
+#' @param stat1 The first stat to plot (e.g., 'hp')
+#' @param stat2 The second stat to plot if creating a scatter plot (e.g., 'attack')
+#' @param plot_type The type of plot ('boxplot' or 'scatter')
+#' @return A ggplot object
+#' @export
+plot_base_stats <- function(data, stat1, stat2 = NULL, plot_type = 'boxplot') {
+  # Ensure stats are valid
+  valid_stats <- c('hp', 'attack', 'defense', 'sp_attack', 'sp_defense', 'speed')
+  if (!(stat1 %in% valid_stats)) {
+    stop(paste("stat1 must be one of:", paste(valid_stats, collapse = ', ')))
+  }
+  if (!is.null(stat2) && !(stat2 %in% valid_stats)) {
+    stop(paste("stat2 must be one of:", paste(valid_stats, collapse = ', ')))
+  }
+  
+  if (plot_type == 'boxplot') {
+    p <- ggplot(data, aes_string(x = 'generation', y = stat1)) +
+      geom_boxplot() +
+      theme_minimal() +
+      labs(
+        title = paste('Distribution of', toupper(stat1), 'Across Generations'),
+        x = 'Generation',
+        y = toupper(stat1)
+      )
+  } else if (plot_type == 'scatter' && !is.null(stat2)) {
+    p <- ggplot(data, aes_string(x = stat1, y = stat2, color = 'factor(is_legendary)')) +
+      geom_point(alpha = 0.7) +
+      theme_minimal() +
+      labs(
+        title = paste(toupper(stat1), 'vs.', toupper(stat2), 'by Legendary Status'),
+        x = toupper(stat1),
+        y = toupper(stat2),
+        color = 'Legendary'
+      )
+  } else {
+    stop("Invalid plot_type or missing stat2 for scatter plot")
+  }
+  
+  return(p)
+}
+```
+
+### Usage and Validation
+
+**Example 1: Boxplot of HP across Generations**
+
+```{r}
+# Generate boxplot
+p1 <- plot_base_stats(pokemon, stat1 = 'hp', plot_type = 'boxplot')
+
+# Display the plot
+print(p1)
+```
+
+**Interpretation**:
+
+- The boxplot shows how HP varies across different generations.
+- It can highlight trends such as whether newer generations have Pokémon with higher HP.
+
+**Example 2: Scatter Plot of Attack vs. Defense**
+
+```{r}
+# Generate scatter plot
+p2 <- plot_base_stats(pokemon, stat1 = 'attack', stat2 = 'defense', plot_type = 'scatter')
+
+# Display the plot
+print(p2)
+```
+
+**Interpretation**:
+
+- The scatter plot illustrates the relationship between attack and defense stats.
+- Coloring by legendary status helps identify if legendaries have distinct stat distributions.
+
+---
+
+## 8. `predictive_test()`
+
+**Description**: Automated check on classification performance of the `classify_legendary()` function.
+
+### Function Definition
+
+Since the `predictive_test()` function is intended to perform automated testing, we can implement this using the `testthat` framework.
+
+Create a test script named `test-classify_legendary.R` in your `tests/testthat/` directory.
+
+```{r}
+# test-classify_legendary.R
+
+library(testthat)
+library(dplyr)
+
+test_that("classify_legendary returns a glm object and achieves acceptable accuracy", {
+  # Load data
+  data <- read.csv("pokemon.csv", stringsAsFactors = FALSE)
+  
+  # Run the function
+  fit <- classify_legendary(data)
+  
+  # Test that the output is a glm object
+  expect_s3_class(fit, "glm")
+  
+  # Prepare data for prediction
+  df <- data %>%
+    filter(!is.na(is_legendary)) %>%
+    mutate(
+      isLegendary = factor(is_legendary, levels = c(0, 1))
+    )
+  
+  # Predict probabilities
+  probs <- predict(fit, type = "response")
+  
+  # Classify based on a threshold (e.g., 0.5)
+  predictions <- ifelse(probs > 0.5, 1, 0)
+  
+  # Calculate accuracy
+  accuracy <- mean(predictions == as.numeric(as.character(df$isLegendary)))
+  
+  # Test that accuracy is above a threshold, e.g., 75%
+  expect_gt(accuracy, 0.75)
+})
+```
+
+
+**Interpretation**:
+
+- The test checks whether the `classify_legendary()` function returns the correct object type and whether the model achieves acceptable accuracy.
+- Ensuring accuracy above a certain threshold validates the model's effectiveness.
+
+---
+
+# Conclusion
+
+With these additional functions, your `PokemonAnalysis` package now includes:
+
+- **`analyze_experience()`**: Analyzes factors influencing experience growth.
+- **`egg_steps_factors()`**: Models egg steps based on stats and type.
+- **`strength_weakness_table()`**: Summarizes damage multipliers against types.
+- **`plot_base_stats()`**: Visualizes distributions of base stats.
+- **`predictive_test()`**: Provides automated testing of classification performance.
+
+Each function includes validation steps and visualizations to enhance the analysis and ensure correctness. Remember to:
+
+- **Document** each function properly using `roxygen2` comments.
+- **Include Examples** in each function's documentation to guide users.
+- **Add Vignettes** demonstrating the use of these functions in real analyses.
+- **Ensure Package Compliance** by checking your package with `R CMD check` to avoid errors and warnings.
+
+By completing these functions and their validations, our group package will offer comprehensive tools for analyzing Pokémon data, making it valuable for users interested in data analysis and the Pokémon universe.
